@@ -21,8 +21,32 @@ public class PlayerController : MonoBehaviour
     //
     private bool died;
 
+    public float walkSpd = 2;
+    public float swimSpd = 1f;
+
+    #region FSM
+    public StateMachine stateMachine;
+
+    public IdleState idleState;
+    public SwimState swimState;
+    public WalkState walkState;
+
+    [HideInInspector]
+    public int walkingParam = Animator.StringToHash("isWalking");
+    [HideInInspector]
+    public int swimmingParam = Animator.StringToHash("isSwimming");
+    #endregion
+
     void Start()
     {
+        stateMachine = new StateMachine();
+
+        idleState = new IdleState(this, stateMachine);
+        swimState = new SwimState(this, stateMachine);
+        walkState = new WalkState(this, stateMachine);
+
+        stateMachine.Initialize(idleState);
+
         // 节点
         anim = GetComponent<Animator>();
         playerGui = transform.Find("Canvas").GetComponent<PlayerGui>();
@@ -33,44 +57,33 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        GetInput();
-        Move();
-    }
-
-    void GetInput()
-    {
-        h = Input.GetAxis("Horizontal");
-        v = Input.GetAxis("Vertical");
-        //keyXPressed = Input.GetKeyDown(KeyCode.X);
-    }
-
-    void Move()
-    {
         inWater = !TileMgr.Instance.HasTile(islandMap, transform.position + new Vector3(0.5f, 0.5f, 0f));
-        anim.SetBool("isSwimming", inWater);
 
-        if (inWater)
-        {
-            Swim();
-        }
-        else
-        {
-            Walk();
-        }
+        stateMachine.currentState.HandleInput();
+        stateMachine.currentState.LogicUpdate();
 
-        moveSpd = inWater ? 1f : 2f;
-        Vector3 moveDir = new Vector3(h, v, 0).normalized;
-        transform.position += moveDir * moveSpd * Time.deltaTime;
-        anim.SetBool("isWalking", moveDir.magnitude > 0);
-
+        //GetInput();
+        //Move();
     }
 
-    private void Walk()
+    private void FixedUpdate()
     {
-        ResetOxygen();
+        stateMachine.currentState.PhysicsUpdate();
     }
 
-    private void Swim()
+    public void Move(float _hInput, float _vInput, float _spd)
+    {
+        Vector3 moveDir = new Vector3(_hInput, _vInput, 0).normalized;
+        transform.position += moveDir * _spd * Time.deltaTime;
+    }
+
+    public void SetAnimationBool(int param, bool value)
+    {
+        anim.SetBool(param, value);
+    }
+
+    // 水中呼吸
+    public void Breathe()
     {
         oxygen -= 0.25f;
         playerGui.UpdateOxygen(oxygen);
@@ -81,7 +94,8 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void ResetOxygen()
+    // 重置氧气。上岸。
+    public void ResetOxygen()
     {
         oxygen = maxOxygen;
         playerGui.UpdateOxygen(oxygen);
@@ -103,5 +117,53 @@ public class PlayerController : MonoBehaviour
         ResetOxygen();
         transform.position = birthPlace.transform.position;
     }
+
+    /*
+    void GetInput()
+    {
+        h = Input.GetAxis("Horizontal");
+        v = Input.GetAxis("Vertical");
+        //keyXPressed = Input.GetKeyDown(KeyCode.X);
+    }
+
+    void OldMove()
+    {
+        inWater = !TileMgr.Instance.HasTile(islandMap, transform.position + new Vector3(0.5f, 0.5f, 0f));
+        anim.SetBool("isSwimming", inWater);
+
+        if (inWater)
+        {
+            Swim();
+        }
+        else
+        {
+            Walk();
+        }
+
+        moveSpd = inWater ? 1f : 2f;
+        Vector3 moveDir = new Vector3(h, v, 0).normalized;
+        transform.position += moveDir * moveSpd * Time.deltaTime;
+        anim.SetBool("isWalking", moveDir.magnitude > 0);
+
+    }
+    */
+
+    /*
+    private void Walk()
+    {
+        ResetOxygen();
+    }
+
+    private void Swim()
+    {
+        oxygen -= 0.25f;
+        playerGui.UpdateOxygen(oxygen);
+
+        if (oxygen <= 0)
+        {
+            PlayerDie();
+        }
+    }
+    */
 
 }
